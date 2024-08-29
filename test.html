@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping Pong Tournament</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            flex-direction: column;
+        }
+        #playerSubmission {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        h2 {
+            margin-bottom: 20px;
+            font-size: 24px;
+            color: #333;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #28a745;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        #gameArea {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 800px;
+            text-align: center;
+            display: none;
+        }
+        canvas {
+            background-color: #000;
+            display: block;
+            margin: 20px auto;
+        }
+        .match {
+            margin: 10px 0;
+        }
+        .winner {
+            color: green;
+            font-weight: bold;
+        }
+        .loser {
+            color: red;
+        }
+        .in-progress {
+            color: orange;
+        }
+        #tournamentWinner {
+            display: none;
+            font-size: 36px;
+            color: #28a745;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="playerSubmission">
+        <h2>Enter Player Names</h2>
+        <input type="text" id="player1" placeholder="Player 1" required>
+        <input type="text" id="player2" placeholder="Player 2" required>
+        <input type="text" id="player3" placeholder="Player 3" required>
+        <input type="text" id="player4" placeholder="Player 4" required>
+        <button onclick="submitPlayers()">Submit Players</button>
+    </div>
+
+    <div id="gameArea">
+        <h2>Matchups</h2>
+        <div id="matchProgress"></div>
+        <canvas id="pongCanvas" width="600" height="400"></canvas>
+    </div>
+
+    <div id="tournamentWinner">
+        <h2 id="winnerMessage"></h2>
+    </div>
+
+    <script>
+        let tournamentId = null;
+        let currentMatch = null;
+        let matchups = [];
+        let currentMatchIndex = 0;
+        const socket = new WebSocket('ws://localhost:8000/ws/tournament/');
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log(data.message);
+
+            if (data.status === 'success') {
+                if (data.next_match) {
+                    currentMatchIndex++;
+                    startNextMatch(data.next_match);
+                } else if (data.matchups) {
+                    displayMatchups(data.matchups);
+                } else if (data.winner) {
+                    displayTournamentWinner(data.winner);
+                }
+            } else {
+                console.error('Error:', data.message);
+            }
+        };
+
+        window.onload = function() {
+            fetch('/create_tournament/')
+            .then(response => response.json())
+            .then(data => {
+                tournamentId = data.tournament_id;
+                console.log('Tournament created with ID:', tournamentId);
+            })
+            .catch(error => console.error('Error creating tournament:', error));
+        };
+
+        function submitPlayers() {
+            const players = [
+                document.getElementById('player1').value,
+                document.getElementById('player2').value,
+                document.getElementById('player3').value,
+                document.getElementById('player4').value,
+            ];
+
+            for (let player of players) {
+                if (!player) {
+                    alert("Please fill in all player names.");
+                    return;
+                }
+            }
+
+            socket.send(JSON.stringify({
+                'action': 'submit_players',
+                'players': players,
+                'tournament_id': tournamentId
+            }));
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.status === 'success') {
+                    matchups = data.matchups;
+                    console.log('Matchups received:', matchups);
+                    displayMatchups(matchups);
+                    startNextMatch(matchups[0]);  // Start the first match immediately
+                } else {
+                    alert(data.message);
+                }
+            };
+        }
+
+        function displayMatchups(matchups) {
+            const matchProgress = document.getElementById('matchProgress');
+            matchProgress.innerHTML = '';
+
+            matchups.forEach((match, index) => {
+                const matchElement = document.createElement('div');
+                matchElement.classList.add('match');
+                matchElement.innerHTML = `
+                    Match ${index + 1}: 
+                    <span class="player">${match.player1}</span> vs 
+                    <span class="player">${match.player2}</span> 
+                    <span class="result" id="result-${index + 1}">[In Progress]</span>
+                `;
+                matchElement.dataset.matchId = index + 1;
+                matchProgress.appendChild(matchElement);
+
+                console.log(`Created match element for Match ID: ${index + 1}`);
+            });
+
+            document.getElementById('playerSubmission').style.display = 'none';
+            document.getElementById('gameArea').style.display = 'block';
+        }
+
+        function startNextMatch(match) {
+            currentMatch = match;
+            console.log('Starting next match:', currentMatch);
+            startGame(currentMatch.match_id, currentMatch.player1, currentMatch.player2);
+        }
+
+        function startGame(matchId, player1, player2) {
+            console.log(`Starting game for Match ID ${matchId}: ${player1} vs ${player2}`);
+            const canvas = document.getElementById('pongCanvas');
+            const ctx = canvas.getContext('2d');
+
+            let ballX = canvas.width / 2;
+            let ballY = canvas.height / 2;
+            let ballSpeedX = 5;
+            let ballSpeedY = 5;
+            const ballRadius = 10;
+
+            const paddleWidth = 10;
+            const paddleHeight = 100;
+            let player1PaddleY = canvas.height / 2 - paddleHeight / 2;
+            let player2PaddleY = canvas.height / 2 - paddleHeight / 2;
+
+            let player1Score = 0;
+            let player2Score = 0;
+            const winningScore = 3;
+
+            document.addEventListener('keydown', function(event) {
+                switch(event.key) {
+                    case 'w':
+                        player1PaddleY = Math.max(0, player1PaddleY - 20);
+                        break;
+                    case 's':
+                        player1PaddleY = Math.min(canvas.height - paddleHeight, player1PaddleY + 20);
+                        break;
+                    case 'ArrowUp':
+                        player2PaddleY = Math.max(0, player2PaddleY - 20);
+                        break;
+                    case 'ArrowDown':
+                        player2PaddleY = Math.min(canvas.height - paddleHeight, player2PaddleY + 20);
+                        break;
+                }
+            });
+
+            function gameLoop() {
+                moveBall();
+                drawEverything();
+                requestAnimationFrame(gameLoop);
+            }
+
+            function moveBall() {
+                ballX += ballSpeedX;
+                ballY += ballSpeedY;
+
+                if (ballY + ballRadius > canvas.height || ballY - ballRadius < 0) {
+                    ballSpeedY = -ballSpeedY;
+                }
+
+                if (ballX - ballRadius < 0) {
+                    if (ballY > player1PaddleY && ballY < player1PaddleY + paddleHeight) {
+                        ballSpeedX = -ballSpeedX;
+                    } else {
+                        player2Score++;
+                        if (player2Score >= winningScore) {
+                            endGame(matchId, player2);
+                            return;
+                        }
+                        resetBall();
+                    }
+                }
+
+                if (ballX + ballRadius > canvas.width) {
+                    if (ballY > player2PaddleY && ballY < player2PaddleY + paddleHeight) {
+                        ballSpeedX = -ballSpeedX;
+                    } else {
+                        player1Score++;
+                        if (player1Score >= winningScore) {
+                            endGame(matchId, player1);
+                            return;
+                        }
+                        resetBall();
+                    }
+                }
+            }
+
+            function resetBall() {
+                ballX = canvas.width / 2;
+                ballY = canvas.height / 2;
+                ballSpeedX = -ballSpeedX;
+            }
+
+            function endGame(matchId, winner) {
+                document.removeEventListener('keydown', () => {});  // Disable paddle control
+                console.log(`Ending game for Match ID ${matchId}. Winner: ${winner}`);
+                socket.send(JSON.stringify({
+                    'action': 'report_result',
+                    'match_id': matchId,
+                    'winner': winner,
+                    'tournament_id': tournamentId
+                }));
+
+                // The next match will start automatically after receiving a response
+            }
+
+            function drawEverything() {
+                // Clear the canvas
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Draw ball
+                ctx.fillStyle = 'white';
+                ctx.beginPath();
+                ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Draw paddles
+                ctx.fillStyle = 'white';
+                ctx.fillRect(10, player1PaddleY, paddleWidth, paddleHeight);
+                ctx.fillRect(canvas.width - 20, player2PaddleY, paddleWidth, paddleHeight);
+
+                // Draw scores
+                ctx.fillText(`${player1}: ${player1Score}`, 100, 50);
+                ctx.fillText(`${player2}: ${player2Score}`, canvas.width - 200, 50);
+            }
+
+            gameLoop();
+        }
+
+        function updateMatchResult(matchId, winner) {
+            console.log(`Updating result for Match ID ${matchId}: Winner is ${winner}`);
+            const resultElement = document.getElementById(`result-${matchId}`);
+            
+            if (!resultElement) {
+                console.error(`Result element for match ID ${matchId} not found.`);
+                return;
+            }
+
+            resultElement.textContent = `[Winner: ${winner}]`;
+            resultElement.classList.add('winner');
+        }
+
+        function displayTournamentWinner(winner) {
+            document.getElementById('gameArea').style.display = 'none';
+            document.getElementById('tournamentWinner').style.display = 'block';
+            document.getElementById('winnerMessage').textContent = `The winner of the tournament is ${winner}!`;
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping Pong Tournament</title>
+    <style>
+        /* Your existing CSS */
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            flex-direction: column;
+        }
+        #playerSubmission {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 300px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        h2 {
+            margin-bottom: 20px;
+            font-size: 24px;
+            color: #333;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #28a745;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        /* Additional CSS */
+        #matchProgress {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+        .match {
+            margin: 10px 0;
+        }
+        .winner {
+            font-weight: bold;
+            color: green;
+        }
+        .loser {
+            font-weight: bold;
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div id="playerSubmission">
+        <h2>Enter Player Names</h2>
+        <input type="text" id="player1" placeholder="Player 1" required>
+        <input type="text" id="player2" placeholder="Player 2" required>
+        <input type="text" id="player3" placeholder="Player 3" required>
+        <input type="text" id="player4" placeholder="Player 4" required>
+        <button onclick="submitPlayers()">Submit Players</button>
+    </div>
+
+    <div id="matchProgress"></div>
+
+    <script>
+        let tournamentId = null;
+        let matchups = [];
+        let currentMatchIndex = 0;
+        const socket = new WebSocket('ws://localhost:8000/ws/tournament/');
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log('Message from server:', data);
+
+            if (data.status === 'success') {
+                if (data.tournament_id) {
+                    tournamentId = data.tournament_id;
+                }
+                if (data.matchups) {
+                    matchups = data.matchups;
+                    displayMatchups();
+                    startNextMatch();
+                }
+                if (data.next_match) {
+                    updateMatchResult(data.next_match.match_id, data.next_match.winner);
+                    startNextMatch();
+                } else if (data.winner) {
+                    displayTournamentWinner(data.winner);
+                }
+            } else {
+                alert(data.message);
+            }
+        };
+
+        function submitPlayers() {
+            const players = [
+                document.getElementById('player1').value,
+                document.getElementById('player2').value,
+                document.getElementById('player3').value,
+                document.getElementById('player4').value,
+            ];
+
+            for (let player of players) {
+                if (!player) {
+                    alert("Please fill in all player names.");
+                    return;
+                }
+            }
+
+            socket.send(JSON.stringify({
+                'action': 'submit_players',
+                'players': players
+            }));
+        }
+
+        function displayMatchups() {
+            const matchProgress = document.getElementById('matchProgress');
+            matchProgress.innerHTML = '';
+
+            matchups.forEach((match, index) => {
+                const matchElement = document.createElement('div');
+                matchElement.classList.add('match');
+                matchElement.innerHTML = `
+                    Match ${index + 1}: 
+                    <span class="player">${match.player1}</span> vs 
+                    <span class="player">${match.player2}</span>
+                    <span class="result" id="result-${match.match_id}">[In Progress]</span>
+                `;
+                matchProgress.appendChild(matchElement);
+            });
+
+            document.getElementById('playerSubmission').style.display = 'none';
+        }
+
+        function startNextMatch() {
+            if (currentMatchIndex < matchups.length) {
+                const match = matchups[currentMatchIndex];
+                currentMatchIndex++;
+                playMatch(match);
+            } else {
+                console.log('All matches completed.');
+            }
+        }
+
+        function playMatch(match) {
+            console.log(`Starting match ${match.match_id}: ${match.player1} vs ${match.player2}`);
+
+            // Simulate the match and randomly choose a winner
+            const winner = Math.random() > 0.5 ? match.player1 : match.player2;
+
+            setTimeout(() => {
+                console.log(`Match ${match.match_id} won by ${winner}`);
+                socket.send(JSON.stringify({
+                    'action': 'report_result',
+                    'tournament_id': tournamentId,
+                    'match_id': match.match_id,
+                    'winner': winner
+                }));
+            }, 2000);  // Simulate a 2-second match duration
+        }
+
+        function updateMatchResult(matchId, winner) {
+            const resultElement = document.getElementById(`result-${matchId}`);
+            if (resultElement) {
+                resultElement.textContent = `[Winner: ${winner}]`;
+                resultElement.classList.add('winner');
+            }
+        }
+
+        function displayTournamentWinner(winner) {
+            const matchProgress = document.getElementById('matchProgress');
+            const winnerElement = document.createElement('div');
+            winnerElement.classList.add('winner');
+            winnerElement.textContent = `Tournament Winner: ${winner}`;
+            matchProgress.appendChild(winnerElement);
+        }
+    </script>
+</body>
+</html>

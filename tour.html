@@ -1,0 +1,427 @@
+<!-- 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping-Pong Tournament</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .player-input {
+            margin-bottom: 10px;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        canvas {
+            display: block;
+            margin: 20px auto;
+            border: 1px solid #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ping-Pong Tournament</h1>
+    <div id="playerInputs">
+        <div class="player-input">
+            <label for="player1">Player 1:</label>
+            <input type="text" id="player1" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player2">Player 2:</label>
+            <input type="text" id="player2" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player3">Player 3:</label>
+            <input type="text" id="player3" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player4">Player 4:</label>
+            <input type="text" id="player4" placeholder="Enter name">
+        </div>
+    </div>
+    <button id="startTournament">Start Tournament</button>
+    <div class="results" id="results"></div>
+
+    <canvas id="pongCanvas" width="700" height="400"></canvas>
+
+    <script>
+        const canvas = document.getElementById('pongCanvas');
+        const ctx = canvas.getContext('2d');
+        let socket;
+
+        function connectWebSocket() {
+            socket = new WebSocket('ws://' + window.location.host + '/ws/tournament/');
+
+            socket.onopen = function() {
+                console.log('WebSocket connection opened');
+            };
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+
+                if (data.status === 'success')
+                    console.log("Matchups: ", data.matchups);
+                else if (data.status === 'start_match')
+                {
+                    alert(`Match starting: ${data.player1} vs ${data.player2}`);
+                    gameLoop();
+                }
+                else if (data.status === 'tournament_complete')
+                    alert(`Tournament Complete! Winner: ${data.winner}`);
+                else
+                    updateGameState(data);
+            };
+
+            socket.onclose = function() {
+                console.log('WebSocket connection closed');
+            };
+
+            socket.onerror = function(error) {
+                console.log('WebSocket error observed:', error);
+            };
+        }
+
+        function updateGameState(gameState) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPaddle(0, gameState.paddle1Y);
+            drawPaddle(canvas.width - 10, gameState.paddle2Y);
+            drawBall(gameState.ballX, gameState.ballY);
+            drawScores(gameState.score1, gameState.score2);
+        }
+
+        function drawPaddle(x, y) {
+            ctx.beginPath();
+            ctx.rect(x, y, 10, 75);
+            ctx.fillStyle = "#0095DD";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawBall(x, y) {
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, Math.PI * 2);
+            ctx.fillStyle = "#0095DD";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawScores(score1, score2) {
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "#0095DD";
+            ctx.fillText(`Player 1: ${score1}`, 20, 20);
+            ctx.fillText(`Player 2: ${score2}`, canvas.width - 100, 20);
+        }
+
+
+        function gameLoop() {
+            requestAnimationFrame(gameLoop);
+            if (socket.readyState === WebSocket.OPEN) {
+                if (wPressed || sPressed) {
+                    socket.send(JSON.stringify({
+                        action: 'paddle_movement',
+                        player: 'player1',
+                        direction: wPressed ? 'up' : 'down'
+                    }));
+                }
+                if (upArrowPressed || downArrowPressed) {
+                    socket.send(JSON.stringify({
+                        action: 'paddle_movement',
+                        player: 'player2',
+                        direction: upArrowPressed ? 'up' : 'down'
+                    }));
+                }
+            }
+        }
+
+        let upArrowPressed = false;
+        let downArrowPressed = false;
+        let wPressed = false;
+        let sPressed = false;
+
+        document.getElementById('startTournament').addEventListener('click', function() {
+            const players = [];
+            for (let i = 1; i <= 4; i++)
+            {
+                const player = document.getElementById(`player${i}`).value.trim();
+                if (player)
+                    players.push(player);
+            }
+
+            if (players.length < 4)
+            {
+                alert("Please enter all four player names.");
+                return;
+            }
+
+            socket.send(JSON.stringify({
+                action: 'submit_players',
+                players: players
+            }));
+
+            socket.send(JSON.stringify({
+                action: 'start_tournament'
+            }));
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'ArrowUp')
+                upArrowPressed = true;
+            else if (event.key === 'ArrowDown')
+                downArrowPressed = true;
+            else if (event.key === 'w')
+                wPressed = true;
+            else if (event.key === 's')
+                sPressed = true;
+        });
+
+        document.addEventListener('keyup', function(event) {
+            if (event.key === 'ArrowUp')
+                upArrowPressed = false;
+            else if (event.key === 'ArrowDown')
+                downArrowPressed = false;
+            else if (event.key === 'w')
+                wPressed = false;
+            else if (event.key === 's')
+                sPressed = false;
+        });
+
+        connectWebSocket();
+    </script>
+</body>
+</html>
+
+
+
+ -->
+
+
+
+
+<!-- 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping-Pong Tournament</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .player-input {
+            margin-bottom: 10px;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        canvas {
+            display: block;
+            margin: 20px auto;
+            border: 1px solid #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ping-Pong Tournament</h1>
+    <div id="playerInputs">
+        <div class="player-input">
+            <label for="player1">Player 1:</label>
+            <input type="text" id="player1" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player2">Player 2:</label>
+            <input type="text" id="player2" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player3">Player 3:</label>
+            <input type="text" id="player3" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player4">Player 4:</label>
+            <input type="text" id="player4" placeholder="Enter name">
+        </div>
+    </div>
+    <button id="startTournament">Start Tournament</button>
+    <div class="results" id="results"></div>
+
+    <canvas id="pongCanvas" width="700" height="400"></canvas>
+
+    <script>
+        const canvas = document.getElementById('pongCanvas');
+        const ctx = canvas.getContext('2d');
+        let socket;
+
+        function connectWebSocket() {
+            socket = new WebSocket('ws://' + window.location.host + '/ws/tournament/');
+
+            socket.onopen = function() {
+                console.log('WebSocket connection opened');
+            };
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                if (data.status === 'success')
+                    console.log("Matchups: ", data.matchups);
+                else if (data.status === 'start_match')
+                {
+                    alert(`Match starting: ${data.player1} vs ${data.player2}`);
+                    gameLoop();
+                }
+                else if (data.status === 'tournament_complete')
+                    alert(`Tournament Complete! Winner: ${data.winner}`);
+                 else
+                    updateGameState(data);
+            };
+
+            socket.onclose = function() {
+                console.log('WebSocket connection closed');
+            };
+
+            socket.onerror = function(error) {
+                console.log('WebSocket error observed:', error);
+            };
+        }
+        // function drawEverything() {
+        //         // Clear the canvas
+        //         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        //         // Draw ball
+        //         ctx.fillStyle = 'white';
+        //         ctx.beginPath();
+        //         ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+        //         ctx.fill();
+
+        //         // Draw paddles
+        //         ctx.fillStyle = 'white';
+        //         ctx.fillRect(10, player1PaddleY, paddleWidth, paddleHeight);
+        //         ctx.fillRect(canvas.width - 20, player2PaddleY, paddleWidth, paddleHeight);
+
+        //         // Draw scores
+        //         ctx.fillText(`${player1}: ${player1Score}`, 100, 50);
+        //         ctx.fillText(`${player2}: ${player2Score}`, canvas.width - 200, 50);
+        // }
+        function updateGameState(gameState)
+        {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPaddle(0, gameState.paddle1Y);
+            drawPaddle(canvas.width - 10, gameState.paddle2Y);
+            drawBall(gameState.ballX, gameState.ballY);
+            drawScores(gameState.score1, gameState.score2);
+        }
+
+        function drawPaddle(x, y) {
+            ctx.beginPath();
+            ctx.rect(x, y, 10, 75);
+            ctx.fillStyle = "#0095DD";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawBall(x, y)
+        {
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, Math.PI * 2);
+            ctx.fillStyle = "#0095DD";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawScores(score1, score2)
+        {
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "#0095DD";
+            ctx.fillText(`Player 1: ${score1}`, 20, 20);
+            ctx.fillText(`Player 2: ${score2}`, canvas.width - 100, 20);
+        }
+
+        function gameLoop()
+        {
+
+            requestAnimationFrame(gameLoop);
+            if (socket.readyState === WebSocket.OPEN)
+            {
+                if (wPressed || sPressed)
+                {
+                    socket.send(JSON.stringify({
+                        action: 'paddle_movement',
+                        player: 'player1',
+                        direction: wPressed ? 'up' : 'down'
+                    }));
+                }
+                if (upArrowPressed || downArrowPressed)
+                {
+                    socket.send(JSON.stringify({
+                        action: 'paddle_movement',
+                        player: 'player2',
+                        direction: upArrowPressed ? 'up' : 'down'
+                    }));
+                }
+            }
+        }
+
+        let upArrowPressed = false;
+        let downArrowPressed = false;
+        let wPressed = false;
+        let sPressed = false;
+
+        document.getElementById('startTournament').addEventListener('click', function() {
+            const players = [];
+            for (let i = 1; i <= 4; i++) {
+                const player = document.getElementById(`player${i}`).value.trim();
+                if (player)
+                    players.push(player);
+            }
+
+            if (players.length < 4)
+            {
+                alert("Please enter all four player names.");
+                return;
+            }
+
+            socket.send(JSON.stringify({
+                action: 'submit_players',
+                players: players
+            }));
+
+            socket.send(JSON.stringify({
+                action: 'start_tournament'
+            }));
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'ArrowUp')
+                upArrowPressed = true;
+            else if (event.key === 'ArrowDown')
+                downArrowPressed = true;
+            else if (event.key === 'w')
+                wPressed = true;
+            else if (event.key === 's')
+                sPressed = true;
+        });
+
+        document.addEventListener('keyup', function(event)
+        {
+            if (event.key === 'ArrowUp')
+                upArrowPressed = false;
+            else if (event.key === 'ArrowDown')
+                downArrowPressed = false;
+            else if (event.key === 'w')
+                wPressed = false;
+            else if (event.key === 's')
+                sPressed = false;
+        });
+
+        connectWebSocket();
+    </script>
+</body>
+</html> -->

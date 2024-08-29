@@ -1,0 +1,452 @@
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping-Pong Tournament</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .player-input {
+            margin-bottom: 10px;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        canvas {
+            display: block;
+            margin: 20px auto;
+            border: 1px solid #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ping-Pong Tournament</h1>
+    <div id="playerInputs">
+        <div class="player-input">
+            <label for="player1">Player 1:</label>
+            <input type="text" id="player1" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player2">Player 2:</label>
+            <input type="text" id="player2" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player3">Player 3:</label>
+            <input type="text" id="player3" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player4">Player 4:</label>
+            <input type="text" id="player4" placeholder="Enter name">
+        </div>
+    </div>
+    <button id="startTournament">Start Tournament</button>
+    <div class="results" id="results"></div>
+
+    <canvas id="pongCanvas" width="700" height="400"></canvas>
+
+    <script>
+        const canvas = document.getElementById('pongCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game settings
+        const paddleWidth = 10;
+        const paddleHeight = 75;
+        const ballRadius = 10;
+        const winningScore = 1;
+
+        let paddle1Y = (canvas.height - paddleHeight) / 2;
+        let paddle2Y = (canvas.height - paddleHeight) / 2;
+        let ballX = canvas.width / 2;
+        let ballY = canvas.height / 2;
+        let ballSpeedX = 2;
+        let ballSpeedY = 2;
+
+        let player1Score = 0;
+        let player2Score = 0;
+        let player1, player2;
+
+        let upArrowPressed = false;
+        let downArrowPressed = false;
+        let wPressed = false;
+        let sPressed = false;
+
+        function drawPaddle(x, y) {
+            ctx.beginPath();
+            ctx.rect(x, y, paddleWidth, paddleHeight);
+            ctx.fillStyle = "#0095DD";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawBall() {
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, ballRadius, 0, Math.PI * 2);
+            ctx.fillStyle = "#0095DD";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawScores() {
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "#0095DD";
+            ctx.fillText(`${player1}: ${player1Score}`, 20, 20);
+            ctx.fillText(`${player2}: ${player2Score}`, canvas.width - 100, 20);
+        }
+
+        function movePaddles()
+        {
+            if (wPressed && paddle1Y > 0)
+                paddle1Y -= 5;
+            if (sPressed && paddle1Y < canvas.height - paddleHeight)
+                paddle1Y += 5;
+            if (upArrowPressed && paddle2Y > 0)
+                paddle2Y -= 5;
+            if (downArrowPressed && paddle2Y < canvas.height - paddleHeight)
+                paddle2Y += 5;
+        }
+
+        function draw()
+        {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPaddle(0, paddle1Y);
+            drawPaddle(canvas.width - paddleWidth, paddle2Y);
+            drawBall();
+            drawScores();
+            movePaddles();
+
+            ballX += ballSpeedX;
+            ballY += ballSpeedY;
+
+            // Ball collision with top and bottom
+            if (ballY + ballSpeedY > canvas.height - ballRadius || ballY + ballSpeedY < ballRadius) {
+                ballSpeedY = -ballSpeedY;
+            }
+
+            // Ball collision with paddles
+            if (ballX + ballSpeedX > canvas.width - ballRadius - paddleWidth)
+            {
+                if (ballY > paddle2Y && ballY < paddle2Y + paddleHeight){
+                    ballSpeedX = -ballSpeedX;
+                    const deltaY = ballY - (paddle2Y + paddleHeight / 2);
+                    ballSpeedY = deltaY * 0.02;
+
+                } else {
+                    player1Score++;
+                    resetBall();
+                }
+            } else if (ballX + ballSpeedX < ballRadius + paddleWidth) {
+                if (ballY > paddle1Y && ballY < paddle1Y + paddleHeight) {
+                    ballSpeedX = -ballSpeedX;
+                    const deltaY = ballY - (paddle1Y + paddleHeight / 2);
+                    ballSpeedY = deltaY * 0.02;
+                } else {
+                    player2Score++;
+                    resetBall();
+                }
+            }
+
+            if (player1Score === winningScore)
+                return player1;
+            else if (player2Score === winningScore)
+                return player2;
+
+            return null;
+        }
+
+        function resetBall() {
+            ballX = canvas.width / 2;
+            ballY = canvas.height / 2;
+            ballSpeedX = -ballSpeedX;
+        }
+
+        async function playMatch(playerOne, playerTwo) {
+            player1 = playerOne;
+            player2 = playerTwo;
+
+            player1Score = 0;
+            player2Score = 0;
+
+            alert(`Match starting: ${player1} vs ${player2}`);
+
+            return new Promise((resolve) => {
+                requestAnimationFrame(function gameLoop() {
+                    const winner = draw();
+                    if (winner) {
+                        resolve(winner);
+                    } else {
+                        requestAnimationFrame(gameLoop);
+                    }
+                });
+            });
+        }
+
+        async function startTournament() {
+            const players = [];
+            for (let i = 1; i <= 4; i++) {
+                const player = document.getElementById(`player${i}`).value.trim();
+                if (player) {
+                    players.push(player);
+                }
+            }
+
+            if (players.length < 4) {
+                alert("Please enter all four player names.");
+                return;
+            }
+
+            const shuffledPlayers = players.sort(() => 0.5 - Math.random());
+            let resultsHTML = "<h2>Tournament Results</h2>";
+
+            // Play semi-finals
+            const winner1 = await playMatch(shuffledPlayers[0], shuffledPlayers[1]);
+            const loser1 = winner1 === shuffledPlayers[0] ? shuffledPlayers[1] : shuffledPlayers[0];
+            const winner2 = await playMatch(shuffledPlayers[2], shuffledPlayers[3]);
+            const loser2 = winner2 === shuffledPlayers[2] ? shuffledPlayers[3] : shuffledPlayers[2];
+
+            resultsHTML += `<p>Semi-final 1: ${shuffledPlayers[0]} vs ${shuffledPlayers[1]} - Winner: ${winner1}</p>`;
+            resultsHTML += `<p>Semi-final 2: ${shuffledPlayers[2]} vs ${shuffledPlayers[3]} - Winner: ${winner2}</p>`;
+
+            // Play classification match
+            const thirdPlaceWinner = await playMatch(loser1, loser2);
+            resultsHTML += `<p>Classification (3rd place): ${loser1} vs ${loser2} - Winner: ${thirdPlaceWinner}</p>`;
+
+            // Play final
+            const tournamentWinner = await playMatch(winner1, winner2);
+            resultsHTML += `<p>Final: ${winner1} vs ${winner2} - Winner: ${tournamentWinner}</p>`;
+
+            document.getElementById('results').innerHTML = resultsHTML;
+        }
+
+        document.getElementById('startTournament').addEventListener('click', startTournament);
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'ArrowUp') {
+                upArrowPressed = true;
+            } else if (event.key === 'ArrowDown') {
+                downArrowPressed = true;
+            } else if (event.key === 'w') {
+                wPressed = true;
+            } else if (event.key === 's') {
+                sPressed = true;
+            }
+        });
+
+        document.addEventListener('keyup', function (event) {
+            if (event.key === 'ArrowUp') {
+                upArrowPressed = false;
+            } else if (event.key === 'ArrowDown') {
+                downArrowPressed = false;
+            } else if (event.key === 'w') {
+                wPressed = false;
+            } else if (event.key === 's') {
+                sPressed = false;
+            }
+        });
+    </script>
+</body>
+</html> -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping-Pong Tournament</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .player-input {
+            margin-bottom: 10px;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        canvas {
+            display: block;
+            margin: 20px auto;
+            border: 1px solid #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ping-Pong Tournament</h1>
+    <div id="playerInputs">
+        <div class="player-input">
+            <label for="player1">Player 1:</label>
+            <input type="text" id="player1" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player2">Player 2:</label>
+            <input type="text" id="player2" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player3">Player 3:</label>
+            <input type="text" id="player3" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player4">Player 4:</label>
+            <input type="text" id="player4" placeholder="Enter name">
+        </div>
+    </div>
+    <button id="startTournament">Start Tournament</button>
+    <div class="results" id="results"></div>
+
+    <canvas id="pongCanvas" width="800" height="400"></canvas>
+
+    <script>
+        const canvas = document.getElementById('pongCanvas');
+        const ctx = canvas.getContext('2d');
+        let socket;
+
+        function connectWebSocket()
+        {
+            socket = new WebSocket('ws://' + window.location.host + '/ws/tournament/');
+
+            socket.onopen = function() {
+                console.log('WebSocket connection opened');
+            };
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+
+                if (data.status === 'success')
+                    console.log("Matchups: ", data.matchups);
+                else if (data.status === 'start_match') {
+                    alert(`Match starting: ${data.player1} vs ${data.player2}`);
+                    gameLoop();
+                }
+                else if (data.status === 'tournament_complete')
+                    alert(`Tournament Complete! Winner: ${data.winner}`);
+                else
+                    updateGameState(data);
+            };
+
+            socket.onclose = function() {
+                console.log('WebSocket connection closed');
+            };
+
+            socket.onerror = function(error) {
+                console.log('WebSocket error observed:', error);
+            };
+        }
+
+        function updateGameState(gameState) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPaddle(0, gameState.paddle1Y);
+            drawPaddle(canvas.width - 10, gameState.paddle2Y);
+            drawBall(gameState.ballX, gameState.ballY);
+            drawScores(gameState.score1, gameState.score2);
+        }
+
+        function drawPaddle(x, y) {
+            ctx.beginPath();
+            ctx.rect(x, y, 10, 75);
+            ctx.fillStyle = "#0095DD";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawBall(x, y) {
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, Math.PI * 2);
+            ctx.fillStyle = "#0095DD";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawScores(score1, score2) {
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "#0095DD";
+            ctx.fillText(`Player 1: ${score1}`, 20, 20);
+            ctx.fillText(`Player 2: ${score2}`, canvas.width - 100, 20);
+        }
+
+        function gameLoop()
+        {
+            requestAnimationFrame(gameLoop);
+            if (socket.readyState === WebSocket.OPEN)
+            {
+                if (wPressed || sPressed)
+                {
+                    socket.send(JSON.stringify({
+                        action: 'paddle_movement',
+                        player: 'player1',
+                        direction: wPressed ? 'up' : 'down'
+                    }));
+                }
+                if (upArrowPressed || downArrowPressed) {
+                    socket.send(JSON.stringify({
+                        action: 'paddle_movement',
+                        player: 'player2',
+                        direction: upArrowPressed ? 'up' : 'down'
+                    }));
+                }
+            }
+        }
+
+        let upArrowPressed = false;
+        let downArrowPressed = false;
+        let wPressed = false;
+        let sPressed = false;
+
+        document.getElementById('startTournament').addEventListener('click', function() {
+            const players = [];
+            for (let i = 1; i <= 4; i++) {
+                const player = document.getElementById(`player${i}`).value.trim();
+                if (player)
+                    players.push(player);
+            }
+
+            if (players.length < 4)
+            {
+                alert("Please enter all four player names.");
+                return;
+            }
+
+            socket.send(JSON.stringify({
+                action: 'submit_players',
+                players: players
+            }));
+
+            socket.send(JSON.stringify({
+                action: 'start_tournament'
+            }));
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'ArrowUp') {
+                upArrowPressed = true;
+            } else if (event.key === 'ArrowDown') {
+                downArrowPressed = true;
+            } else if (event.key === 'w') {
+                wPressed = true;
+            } else if (event.key === 's') {
+                sPressed = true;
+            }
+        });
+
+        document.addEventListener('keyup', function(event) {
+            if (event.key === 'ArrowUp') {
+                upArrowPressed = false;
+            } else if (event.key === 'ArrowDown') {
+                downArrowPressed = false;
+            } else if (event.key === 'w') {
+                wPressed = false;
+            } else if (event.key === 's') {
+                sPressed = false;
+            }
+        });
+
+        connectWebSocket();
+    </script>
+</body>
+</html>
