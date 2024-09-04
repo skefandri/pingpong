@@ -1,4 +1,4 @@
-
+<!-- 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -63,6 +63,7 @@
     Results Section 
     <div class="results" id="results"></div>
 
+    Canvas Section 
     <div class="canvas-container">
         <canvas id="pongCanvas" width="800" height="400"></canvas>
     </div>
@@ -82,8 +83,7 @@
                 const resultsDiv = document.getElementById('results');
 
                 resultsDiv.innerHTML += "<h3>Semi-Finals</h3>";
-                semiFinals.forEach((match, index) =>
-                {
+                semiFinals.forEach((match, index) => {
                     resultsDiv.innerHTML += `<p>Match ${index + 1}: ${match[0]} vs ${match[1]} - Winner: ${match.winner}</p>`;
                 });
 
@@ -94,12 +94,13 @@
                 resultsDiv.innerHTML += `<p>${finalMatch[0]} vs ${finalMatch[1]} - Winner: ${finalMatch.winner}</p>`;
             }
 
-            socket.onmessage = function(event)
-            {
+            socket.onmessage = function(event) {
                 const data = JSON.parse(event.data);
 
                 if (data.status === 'success')
+                {
                     console.log("Matchups: ", data.matchups);
+                }
                 else if (data.status === 'start_match')
                 {
                     alert(`Match starting: ${data.player1} vs ${data.player2}`);
@@ -130,14 +131,12 @@
             };
         }
 
-        function displayMatchResult(stage, matchNumber, winner)
-        {
+        function displayMatchResult(stage, matchNumber, winner) {
             const stageName = stage === "semi_finals" ? "Semi-final" : (matchNumber === 1 ? "3rd Place" : "Final");
             const resultText = `<p>${stageName} ${matchNumber}: Winner - ${winner}</p>`;
             document.getElementById('results').innerHTML += resultText;
         }
-        function updateGameState(gameState)
-        {
+        function updateGameState(gameState) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             drawPaddle(0, gameState.paddle1Y);
             drawPaddle(canvas.width - 10, gameState.paddle2Y);
@@ -252,4 +251,4 @@
         connectWebSocket();
     </script>
 </body>
-</html> 
+</html>  -->

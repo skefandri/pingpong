@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping-Pong Tournament</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .player-input {
+            margin-bottom: 10px;
+        }
+        .results {
+            margin-top: 20px;
+        }
+        canvas {
+            display: block;
+            margin: 20px auto;
+            border: 1px solid #000;
+        }
+    </style>
+</head>
+<body>
+    <h1>Ping-Pong Tournament</h1>
+    <div id="playerInputs">
+        <div class="player-input">
+            <label for="player1">Player 1:</label>
+            <input type="text" id="player1" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player2">Player 2:</label>
+            <input type="text" id="player2" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player3">Player 3:</label>
+            <input type="text" id="player3" placeholder="Enter name">
+        </div>
+        <div class="player-input">
+            <label for="player4">Player 4:</label>
+            <input type="text" id="player4" placeholder="Enter name">
+        </div>
+    </div>
+    <button id="startTournament">Start Tournament</button>
+    <div class="results" id="results"></div>
+
+    <canvas id="pongCanvas" width="800" height="400"></canvas>
+
+    <script>
+        const canvas = document.getElementById('pongCanvas');
+        const ctx = canvas.getContext('2d');
+        let socket;
+
+        function connectWebSocket() {
+            socket = new WebSocket('ws://' + window.location.host + '/ws/tournament/');
+
+            socket.onopen = function() {
+                console.log('WebSocket connection opened');
+            };
+
+            socket.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+
+                if (data.status === 'success')
+                {
+                    console.log("Matchups: ", data.matchups);
+                }
+                else if (data.status === 'start_match') {
+                    alert(`Match starting: ${data.player1} vs ${data.player2}`);
+                    gameLoop();
+                }
+                else if (data.status === 'match_result') {
+                    displayMatchResult(data.stage, data.match_number, data.winner);
+                }
+                else if (data.status === 'tournament_complete')
+                {
+                    alert(`Tournament Complete! Winner: ${data.winner}`);
+                    document.getElementById('results').innerHTML += `<p><strong>Tournament Winner: ${data.winner}</strong></p>`;
+                } else {
+                    updateGameState(data);
+                }
+            };
+
+            socket.onclose = function() {
+                console.log('WebSocket connection closed');
+            };
+
+            socket.onerror = function(error) {
+                console.log('WebSocket error observed:', error);
+            };
+        }
+
+        function displayMatchResult(stage, matchNumber, winner) {
+            const stageName = stage === "semi_finals" ? "Semi-final" : (matchNumber === 1 ? "3rd Place" : "Final");
+            const resultText = `<p>${stageName} ${matchNumber}: Winner - ${winner}</p>`;
+            document.getElementById('results').innerHTML += resultText;
+        }
+
+        function updateGameState(gameState) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawPaddle(0, gameState.paddle1Y);
+            drawPaddle(canvas.width - 10, gameState.paddle2Y);
+            drawBall(gameState.ballX, gameState.ballY);
+            drawScores(gameState.score1, gameState.score2);
+        }
+
+        function drawPaddle(x, y) {
+            ctx.beginPath();
+            ctx.rect(x, y, 10, 75);
+            ctx.fillStyle = "#0095DD";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawBall(x, y) {
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, Math.PI * 2);
+            ctx.fillStyle = "#0095DD";
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        function drawScores(score1, score2) {
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "#0095DD";
+            ctx.fillText(`Player 1: ${score1}`, 20, 20);
+            ctx.fillText(`Player 2: ${score2}`, canvas.width - 100, 20);
+        }
+
+        function gameLoop() {
+            requestAnimationFrame(gameLoop);
+            if (socket.readyState === WebSocket.OPEN) {
+                if (wPressed || sPressed) {
+                    socket.send(JSON.stringify({
+                        action: 'paddle_movement',
+                        player: 'player1',
+                        direction: wPressed ? 'up' : 'down'
+                    }));
+                }
+                if (upArrowPressed || downArrowPressed) {
+                    socket.send(JSON.stringify({
+                        action: 'paddle_movement',
+                        player: 'player2',
+                        direction: upArrowPressed ? 'up' : 'down'
+                    }));
+                }
+            }
+        }
+
+        let upArrowPressed = false;
+        let downArrowPressed = false;
+        let wPressed = false;
+        let sPressed = false;
+
+        document.getElementById('startTournament').addEventListener('click', function() {
+            const players = [];
+            for (let i = 1; i <= 4; i++) {
+                const player = document.getElementById(`player${i}`).value.trim();
+                if (player) players.push(player);
+            }
+
+            if (players.length < 4) {
+                alert("Please enter all four player names.");
+                return;
+            }
+
+            socket.send(JSON.stringify({
+                action: 'submit_players',
+                players: players
+            }));
+
+            socket.send(JSON.stringify({
+                action: 'start_tournament'
+            }));
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'ArrowUp') {
+                upArrowPressed = true;
+            } else if (event.key === 'ArrowDown') {
+                downArrowPressed = true;
+            } else if (event.key === 'w') {
+                wPressed = true;
+            } else if (event.key === 's') {
+                sPressed = true;
+            }
+        });
+
+        document.addEventListener('keyup', function(event) {
+            if (event.key === 'ArrowUp') {
+                upArrowPressed = false;
+            } else if (event.key === 'ArrowDown') {
+                downArrowPressed = false;
+            } else if (event.key === 'w') {
+                wPressed = false;
+            } else if (event.key === 's') {
+                sPressed = false;
+            }
+        });
+
+        connectWebSocket();
+    </script>
+</body>
+</html>
+
+
+import json
+import random
+from channels.generic.websocket import AsyncWebsocketConsumer
+import asyncio
+
+class TournamentConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        await self.accept()
+        self.players = []
+        self.matchups = []
+        self.winners = []
+        self.losers = []
+        self.current_stage = "semi_finals"  # Track the current stage of the tournament
+        self.current_match = 0
+        self.game_state = {
+            'paddle1Y': (400 - 75) / 2,
+            'paddle2Y': (400 - 75) / 2,
+            'ballX': 800 / 2,
+            'ballY': 400 / 2,
+            'ballSpeedX': 2,
+            'ballSpeedY': 2,
+            'score1': 0,
+            'score2': 0,
+            'gameOver': False,
+            'winner': ''
+        }
+
+    async def disconnect(self, close_code):
+        await self.close()
+        print(f"WebSocket connection closed with code: {close_code}")
+
+    async def receive(self, text_data):
+        data = json.loads(text_data)
+        action = data.get('action')
+
+        if action == 'submit_players':
+            self.players = data.get('players')
+            random.shuffle(self.players)
+            self.matchups = [
+                (self.players[0], self.players[1]),
+                (self.players[2], self.players[3])
+            ]
+            await self.send(text_data=json.dumps({
+                'status': 'success',
+                'matchups': self.matchups,
+            }))
+
+        elif action == 'start_tournament':
+            self.current_stage = "semi_finals"
+            self.current_match = 0
+            self.winners = []
+            self.losers = []
+            await self.start_next_match()
+
+        elif action == 'paddle_movement':
+            self.handle_paddle_movement(data.get('player'), data.get('direction'))
+
+    def handle_paddle_movement(self, player, direction):
+        if player == 'player1':
+            if direction == 'up':
+                self.game_state['paddle1Y'] = max(self.game_state['paddle1Y'] - 8, 0)
+            elif direction == 'down':
+                self.game_state['paddle1Y'] = min(self.game_state['paddle1Y'] + 8, 400 - 75)
+        elif player == 'player2':
+            if direction == 'up':
+                self.game_state['paddle2Y'] = max(self.game_state['paddle2Y'] - 8, 0)
+            elif direction == 'down':
+                self.game_state['paddle2Y'] = min(self.game_state['paddle2Y'] + 8, 400 - 75)
+
+    async def start_next_match(self):
+        if self.current_stage == "semi_finals":
+            if self.current_match < len(self.matchups):
+                player1, player2 = self.matchups[self.current_match]
+                self.reset_game_state(player1, player2)
+                await self.send(text_data=json.dumps({
+                    'status': 'start_match',
+                    'player1': player1,
+                    'player2': player2,
+                }))
+                asyncio.create_task(self.run_game_loop())
+            else:
+                # After semi-finals, set up the 3rd place and final matches
+                self.current_stage = "finals"
+                self.current_match = 0
+                self.matchups = [
+                    (self.losers[0], self.losers[1]),  # Third-place match
+                    (self.winners[0], self.winners[1])  # Final match
+                ]
+                await self.start_next_match()
+        elif self.current_stage == "finals":
+            if self.current_match < len(self.matchups):
+                player1, player2 = self.matchups[self.current_match]
+                self.reset_game_state(player1, player2)
+                await self.send(text_data=json.dumps({
+                    'status': 'start_match',
+                    'player1': player1,
+                    'player2': player2,
+                }))
+                asyncio.create_task(self.run_game_loop())
+            else:
+                tournament_winner = self.winners[-1]
+                await self.send(text_data=json.dumps({
+                    'status': 'tournament_complete',
+                    'winner': tournament_winner,
+                }))
+
+    async def run_game_loop(self):
+        while not self.game_state['gameOver']:
+            self.update_ball_position()
+            await self.send_game_state()
+            await asyncio.sleep(0.02)
+
+    def update_ball_position(self):
+        if not self.game_state['gameOver']:
+            # Update ball position
+            self.game_state['ballX'] += self.game_state['ballSpeedX']
+            self.game_state['ballY'] += self.game_state['ballSpeedY']
+
+            # Ball collision with top and bottom walls
+            if self.game_state['ballY'] - 10 < 0 or self.game_state['ballY'] + 10 > 400:
+                self.game_state['ballSpeedY'] = -self.game_state['ballSpeedY']
+
+            # Ball collision with paddles
+            if self.game_state['ballX'] - 10 <= 10:  # Left paddle (Player 1)
+                if self.game_state['paddle1Y'] < self.game_state['ballY'] < self.game_state['paddle1Y'] + 75:
+                    self.game_state['ballSpeedX'] = -self.game_state['ballSpeedX']
+                    deltaY = self.game_state['ballY'] - (self.game_state['paddle1Y'] + 75 / 2)
+                    self.game_state['ballSpeedY'] += deltaY * 0.02  # Slight variation in speed based on hit point
+                else:
+                    self.game_state['score2'] += 1
+                    self.reset_ball()
+
+            elif self.game_state['ballX'] + 10 >= 800 - 10:  # Right paddle (Player 2)
+                if self.game_state['paddle2Y'] < self.game_state['ballY'] < self.game_state['paddle2Y'] + 75:
+                    self.game_state['ballSpeedX'] = -self.game_state['ballSpeedX']
+                    deltaY = self.game_state['ballY'] - (self.game_state['paddle2Y'] + 75 / 2)
+                    self.game_state['ballSpeedY'] += deltaY * 0.02  # Slight variation in speed based on hit point
+                else:
+                    self.game_state['score1'] += 1
+                    self.reset_ball()
+
+            # Check if someone won
+            if self.game_state['score1'] >= 1:
+                asyncio.create_task(self.end_match(self.game_state['player1']))
+
+            elif self.game_state['score2'] >= 1:
+                asyncio.create_task(self.end_match(self.game_state['player2']))
+    async def end_match(self, winner):
+        self.game_state['gameOver'] = True
+        self.game_state['winner'] = winner
+
+        if self.current_stage == "semi_finals":
+            self.winners.append(winner)
+            if self.current_match < len(self.matchups):
+                loser = self.matchups[self.current_match][0] if winner != self.matchups[self.current_match][0] else self.matchups[self.current_match][1]
+                self.losers.append(loser)
+            else:
+                # Handle case where matchups list is not as expected
+                print("Error: No matchups available for the current match")
+                await self.send(text_data=json.dumps({
+                    'status': 'error',
+                    'message': 'No matchups available'
+                }))
+                return
+        elif self.current_stage == "finals":
+            if self.current_match == 0:  # Third place match
+                self.losers.append(winner)
+            elif self.current_match == 1:  # Final match
+                self.winners.append(winner)
+
+        # Send the match result to the client
+        await self.send(text_data=json.dumps({
+            'status': 'match_result',
+            'stage': self.current_stage,
+            'match_number': self.current_match + 1,
+            'winner': winner
+        }))
+
+        self.current_match += 1
+        asyncio.create_task(self.start_next_match())
+
+    # async def end_match(self, winner):
+    #     self.game_state['gameOver'] = True
+    #     self.game_state['winner'] = winner
+
+    #     if self.current_stage == "semi_finals":
+    #         self.winners.append(winner)
+    #         loser = self.matchups[self.current_match][0] if winner != self.matchups[self.current_match][0] else self.matchups[self.current_match][1]
+    #         self.losers.append(loser)
+    #     elif self.current_stage == "finals":
+    #         if self.current_match == 0:  # Third place match
+    #             self.losers.append(winner)
+    #         else:  # Final match
+    #             self.winners.append(winner)
+
+    #     # Send the match result to the client
+    #     await self.send(text_data=json.dumps({
+    #         'status': 'match_result',
+    #         'stage': self.current_stage,
+    #         'match_number': self.current_match + 1,
+    #         'winner': winner
+    #     }))
+
+    #     self.current_match += 1
+    #     asyncio.create_task(self.start_next_match())
+
+    def reset_ball(self):
+        self.game_state['ballX'] = 800 / 2
+        self.game_state['ballY'] = 400 / 2
+        self.game_state['ballSpeedX'] = random.choice([-2, 2])
+        self.game_state['ballSpeedY'] = random.choice([-2, 2])
+
+    def reset_game_state(self, player1, player2):
+        self.game_state = {
+            'paddle1Y': (400 - 75) / 2,
+            'paddle2Y': (400 - 75) / 2,
+            'ballX': 800 / 2,
+            'ballY': 400 / 2,
+            'ballSpeedX': random.choice([-2, 2]),
+            'ballSpeedY': random.choice([-2, 2]),
+            'score1': 0,
+            'score2': 0,
+            'gameOver': False,
+            'winner': '',
+            'player1': player1,
+            'player2': player2
+        }
+
+    async def send_game_state(self):
+        await self.send(text_data=json.dumps(self.game_state))

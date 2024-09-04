@@ -1,4 +1,3 @@
-
 import json
 import random
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -11,13 +10,15 @@ class TournamentConsumer(AsyncWebsocketConsumer):
         self.matchups = []
         self.winners = []
         self.losers = []
+        self.current_stage = "semi_finals"  # Track the current stage of the tournament
         self.current_match = 0
+        self.current_game_loop_task = None  # Keep track of the current game loop task
         self.game_state = {
             'paddle1Y': (400 - 75) / 2,
             'paddle2Y': (400 - 75) / 2,
             'ballX': 800 / 2,
             'ballY': 400 / 2,
-            'ballSpeedX': 2,  # Set a reasonable speed for the ball
+            'ballSpeedX': 2,
             'ballSpeedY': 2,
             'score1': 0,
             'score2': 0,
@@ -26,21 +27,19 @@ class TournamentConsumer(AsyncWebsocketConsumer):
         }
 
     async def disconnect(self, close_code):
+        if self.current_game_loop_task:
+            self.current_game_loop_task.cancel()
         await self.close()
         print(f"WebSocket connection closed with code: {close_code}")
 
-
     async def receive(self, text_data):
         data = json.loads(text_data)
-        print(f"Received data: {data}")
+        print(f"data: {data}")
         action = data.get('action')
-        print("================================")
-        print(f"action: {action}")
+
         if action == 'submit_players':
             self.players = data.get('players')
-            print(f"players before radom.shuffle: {self.players}")
             random.shuffle(self.players)
-            print(f"players After radom.shuffle: {self.players}")
             self.matchups = [
                 (self.players[0], self.players[1]),
                 (self.players[2], self.players[3])
@@ -51,71 +50,118 @@ class TournamentConsumer(AsyncWebsocketConsumer):
             }))
 
         elif action == 'start_tournament':
+            self.current_stage = "semi_finals"
             self.current_match = 0
             self.winners = []
+            self.losers = []
             await self.start_next_match()
 
         elif action == 'paddle_movement':
             self.handle_paddle_movement(data.get('player'), data.get('direction'))
 
     def handle_paddle_movement(self, player, direction):
+        # Slow down the paddle movement by reducing the step size
+        step_size = 2  # Adjust this value to control the paddle speed
         if player == 'player1':
+            print(f"player: {player} directiom: {direction}")
             if direction == 'up':
-                self.game_state['paddle1Y'] = max(self.game_state['paddle1Y'] - 8, 0)
-                print(f"self.game_state['paddle1Y']: {self.game_state['paddle1Y']}")
-                self.game_state['paddle1Y'] -= 2
+                self.game_state['paddle1Y'] = max(self.game_state['paddle1Y'] - step_size, 0)
             elif direction == 'down':
-                self.game_state['paddle1Y'] = min(self.game_state['paddle1Y'] + 8, 400 - 75)
-                print(f"self.game_state['paddle1Y']: {self.game_state['paddle1Y']}")
-                self.game_state['paddle1Y'] += 2
+                self.game_state['paddle1Y'] = min(self.game_state['paddle1Y'] + step_size, 400 - 75)
         elif player == 'player2':
             if direction == 'up':
-                self.game_state['paddle2Y'] = max(self.game_state['paddle2Y'] - 8, 0)
-                print(f"self.game_state['paddle2Y']: {self.game_state['paddle1Y']}")
-                self.game_state['paddle2Y'] -= 2
+                self.game_state['paddle2Y'] = max(self.game_state['paddle2Y'] - step_size, 0)
             elif direction == 'down':
-                self.game_state['paddle2Y'] = min(self.game_state['paddle2Y'] + 8, 400 - 75)
-                print(f"self.game_state['paddle2Y']: {self.game_state['paddle1Y']}")
-                self.game_state['paddle2Y'] += 2
+                self.game_state['paddle2Y'] = min(self.game_state['paddle2Y'] + step_size, 400 - 75)
+
     async def start_next_match(self):
-        if self.current_match < len(self.matchups):
-            print(f"self.current_match: {self.current_match}, len(self.matchups): {len(self.matchups)}")
-            player1, player2 = self.matchups[self.current_match]
-            print("=========================================")
-            print(f"player1: {player1}, player2: {player2}")
-            self.game_state['score1'] = 0
-            self.game_state['score2'] = 0
-            self.game_state['gameOver'] = False
-            self.game_state['winner'] = ''
-            self.game_state['ballX'] = 800 / 2  # Reset ball position
-            self.game_state['ballY'] = 400 / 2
-            self.game_state['ballSpeedX'] = random.choice([-4, 4])
-            self.game_state['ballSpeedY'] = random.choice([-4, 4])
-            self.game_state['player1'] = player1
-            self.game_state['player2'] = player2
-            await self.send(text_data=json.dumps({
-                'status': 'start_match',
-                'player1': player1,
-                'player2': player2,
-            }))
-            asyncio.create_task(self.run_game_loop())
-        else:
-            tournament_winner = self.determine_tournament_winner()
-            await self.send(text_data=json.dumps({
-                'status': 'tournament_complete',
-                'winner': tournament_winner,
-            }))
+        if self.current_game_loop_task:
+            self.current_game_loop_task.cancel()
+        
+        if self.current_stage == "semi_finals":
+            if self.current_match < len(self.matchups):
+                player1, player2 = self.matchups[self.current_match]
+                self.reset_game_state(player1, player2)
+                await self.send(text_data=json.dumps({
+                    'status': 'start_match',
+                    'player1': player1,
+                    'player2': player2,
+                }))
+                self.current_game_loop_task = asyncio.create_task(self.run_game_loop())
+            else:
+                # After semi-finals, set up the 3rd place and final matches
+                self.current_stage = "finals"
+                self.current_match = 0
+                self.matchups = [
+                    (self.losers[0], self.losers[1]),  # Third-place match
+                    (self.winners[0], self.winners[1])  # Final match
+                ]
+                await self.start_next_match()
+        elif self.current_stage == "finals":
+            if self.current_match < len(self.matchups):
+                player1, player2 = self.matchups[self.current_match]
+                self.reset_game_state(player1, player2)
+                await self.send(text_data=json.dumps({
+                    'status': 'start_match',
+                    'player1': player1,
+                    'player2': player2,
+                }))
+                self.current_game_loop_task = asyncio.create_task(self.run_game_loop())
+            else:
+                tournament_winner = self.winners[-1]
+                await self.send(text_data=json.dumps({
+                    'status': 'tournament_complete',
+                    'winner': tournament_winner,
+                    'semi_final_results': self.matchups[:2],
+                    'third_place_result': self.matchups[0],
+                    'final_result': self.matchups[1],
+                }))
+
+    # async def start_next_match(self):
+    #     if self.current_game_loop_task:
+    #         self.current_game_loop_task.cancel()
+        
+    #     if self.current_stage == "semi_finals":
+    #         if self.current_match < len(self.matchups):
+    #             player1, player2 = self.matchups[self.current_match]
+    #             self.reset_game_state(player1, player2)
+    #             await self.send(text_data=json.dumps({
+    #                 'status': 'start_match',
+    #                 'player1': player1,
+    #                 'player2': player2,
+    #             }))
+    #             self.current_game_loop_task = asyncio.create_task(self.run_game_loop())
+    #         else:
+    #             # After semi-finals, set up the 3rd place and final matches
+    #             self.current_stage = "finals"
+    #             self.current_match = 0
+    #             self.matchups = [
+    #                 (self.losers[0], self.losers[1]),  # Third-place match
+    #                 (self.winners[0], self.winners[1])  # Final match
+    #             ]
+    #             await self.start_next_match()
+    #     elif self.current_stage == "finals":
+    #         if self.current_match < len(self.matchups):
+    #             player1, player2 = self.matchups[self.current_match]
+    #             self.reset_game_state(player1, player2)
+    #             await self.send(text_data=json.dumps({
+    #                 'status': 'start_match',
+    #                 'player1': player1,
+    #                 'player2': player2,
+    #             }))
+    #             self.current_game_loop_task = asyncio.create_task(self.run_game_loop())
+    #         else:
+    #             tournament_winner = self.winners[-1]
+    #             await self.send(text_data=json.dumps({
+    #                 'status': 'tournament_complete',
+    #                 'winner': tournament_winner,
+    #             }))
 
     async def run_game_loop(self):
         while not self.game_state['gameOver']:
             self.update_ball_position()
             await self.send_game_state()
-            await asyncio.sleep(0.02)  # Controls the speed of the game loop (60 ms per frame)
-
-    def determine_tournament_winner(self):
-        # The final match is between the winners of the two semi-final matches
-        final_match_winner = self.winners[-1]  # The winner of the final match
-        return final_match_winner
+            await asyncio.sleep(0.02)
 
     def update_ball_position(self):
         if not self.game_state['gameOver']:
@@ -148,26 +194,52 @@ class TournamentConsumer(AsyncWebsocketConsumer):
 
             # Check if someone won
             if self.game_state['score1'] >= 1:
-                self.game_state['gameOver'] = True
-                self.game_state['winner'] = self.game_state['player1']
-                self.winners.append(self.game_state['player1'])
-                # self.losers.append(self.game_state['player2'])
-                self.current_match += 1
-                asyncio.create_task(self.start_next_match())
+                self.end_match(self.game_state['player1'])
 
             elif self.game_state['score2'] >= 1:
-                self.game_state['gameOver'] = True
-                self.game_state['winner'] = self.game_state['player2']
-                self.winners.append(self.game_state['player2'])
-                # self.losers.append(self.game_state['player1'])
-                self.current_match += 1
-                asyncio.create_task(self.start_next_match())
+                self.end_match(self.game_state['player2'])
+
+    def end_match(self, winner):
+        self.game_state['gameOver'] = True
+        self.game_state['winner'] = winner
+
+        if self.current_stage == "semi_finals":
+            self.winners.append(winner)
+            loser = self.matchups[self.current_match][0] if winner != self.matchups[self.current_match][0] else self.matchups[self.current_match][1]
+            self.losers.append(loser)
+
+        elif self.current_stage == "finals":
+            if self.current_match == 0:  # Third place match
+                self.losers.append(winner)
+            else:  # Final match
+                self.winners.append(winner)
+
+        self.current_match += 1
+        asyncio.create_task(self.start_next_match())
 
     def reset_ball(self):
-        self.game_state['ballX'] = 700 / 2
+        self.game_state['ballX'] = 800 / 2
         self.game_state['ballY'] = 400 / 2
-        self.game_state['ballSpeedX'] = random.choice([-4, 4])
-        self.game_state['ballSpeedY'] = random.choice([-4, 4])
+        self.game_state['ballSpeedX'] = random.choice([-2, 2])
+        self.game_state['ballSpeedY'] = random.choice([-2, 2])
+        self.game_state['paddle1Y'] = (400 - 75) / 2
+        self.game_state['paddle2Y'] = (400 - 75) / 2
+
+    def reset_game_state(self, player1, player2):
+        self.game_state = {
+            'paddle1Y': (400 - 75) / 2,
+            'paddle2Y': (400 - 75) / 2,
+            'ballX': 800 / 2,
+            'ballY': 400 / 2,
+            'ballSpeedX': random.choice([-2, 2]),
+            'ballSpeedY': random.choice([-2, 2]),
+            'score1': 0,
+            'score2': 0,
+            'gameOver': False,
+            'winner': '',
+            'player1': player1,
+            'player2': player2
+        }
 
     async def send_game_state(self):
         await self.send(text_data=json.dumps(self.game_state))

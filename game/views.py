@@ -3,6 +3,8 @@ from django.shortcuts import render
 # Create your views here.
 def tournaments(request):
     return render(request, "game/tournament.html")
+def index(request):
+    return render(request, "game/index.html")
 
 from django.shortcuts import render
 from django.http import JsonResponse

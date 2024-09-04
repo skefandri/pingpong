@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ping-Pong Tournament - Player Input</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            background-color: #f4f4f4;
+        }
+        .container {
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .player-input {
+            margin-bottom: 10px;
+        }
+        input[type="text"] {
+            padding: 8px;
+            width: 100%;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ping-Pong Tournament</h1>
+        <div id="playerInputs">
+            <div class="player-input">
+                <label for="player1">Player 1:</label>
+                <input type="text" id="player1" placeholder="Enter name">
+            </div>
+            <div class="player-input">
+                <label for="player2">Player 2:</label>
+                <input type="text" id="player2" placeholder="Enter name">
+            </div>
+            <div class="player-input">
+                <label for="player3">Player 3:</label>
+                <input type="text" id="player3" placeholder="Enter name">
+            </div>
+            <div class="player-input">
+                <label for="player4">Player 4:</label>
+                <input type="text" id="player4" placeholder="Enter name">
+            </div>
+        </div>
+        <button id="startTournament">Start Tournament</button>
+    </div>
+
+    <script>
+        document.getElementById('startTournament').addEventListener('click', function() {
+            const players = [];
+            for (let i = 1; i <= 4; i++) {
+                const player = document.getElementById(`player${i}`).value.trim();
+                if (player) players.push(player);
+            }
+
+            if (players.length < 4) {
+                alert("Please enter all four player names.");
+                return;
+            }
+
+            localStorage.setItem('players', JSON.stringify(players));
+            console.log("wach abogos");
+            window.location.href = 'tournament';
+            console.log("khona ma3rfch fin ymchi")
+        });
+    </script>
+</body>
+</html>
