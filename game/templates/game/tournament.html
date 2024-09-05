@@ -1,4 +1,4 @@
-
+<!-- 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -82,8 +82,10 @@
                 const resultsDiv = document.getElementById('results');
 
                 resultsDiv.innerHTML += "<h3>Semi-Finals</h3>";
+                console.log("semiFInal: ", semiFinals);
                 semiFinals.forEach((match, index) =>
                 {
+                    console.log("match: ", match);
                     resultsDiv.innerHTML += `<p>Match ${index + 1}: ${match[0]} vs ${match[1]} - Winner: ${match.winner}</p>`;
                 });
 
@@ -252,4 +254,33 @@
         connectWebSocket();
     </script>
 </body>
-</html> 
+</html>  -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <h1>hello</h1>
+    <script>
+        console.log("hello");
+        function MyButton() {
+            return (
+            <button>I'm a button</button>
+            );
+        }
+        export default function MyApp() {
+        return (
+            <div>
+            <h1>Welcome to my app</h1>
+            <MyButton />
+            </div>
+        );
+        }
+        MyButton();
+        // MyApp();
+    </script>
+</body>
+</html>

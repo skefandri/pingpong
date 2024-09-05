@@ -116,47 +116,6 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                     'third_place_result': self.matchups[0],
                     'final_result': self.matchups[1],
                 }))
-
-    # async def start_next_match(self):
-    #     if self.current_game_loop_task:
-    #         self.current_game_loop_task.cancel()
-        
-    #     if self.current_stage == "semi_finals":
-    #         if self.current_match < len(self.matchups):
-    #             player1, player2 = self.matchups[self.current_match]
-    #             self.reset_game_state(player1, player2)
-    #             await self.send(text_data=json.dumps({
-    #                 'status': 'start_match',
-    #                 'player1': player1,
-    #                 'player2': player2,
-    #             }))
-    #             self.current_game_loop_task = asyncio.create_task(self.run_game_loop())
-    #         else:
-    #             # After semi-finals, set up the 3rd place and final matches
-    #             self.current_stage = "finals"
-    #             self.current_match = 0
-    #             self.matchups = [
-    #                 (self.losers[0], self.losers[1]),  # Third-place match
-    #                 (self.winners[0], self.winners[1])  # Final match
-    #             ]
-    #             await self.start_next_match()
-    #     elif self.current_stage == "finals":
-    #         if self.current_match < len(self.matchups):
-    #             player1, player2 = self.matchups[self.current_match]
-    #             self.reset_game_state(player1, player2)
-    #             await self.send(text_data=json.dumps({
-    #                 'status': 'start_match',
-    #                 'player1': player1,
-    #                 'player2': player2,
-    #             }))
-    #             self.current_game_loop_task = asyncio.create_task(self.run_game_loop())
-    #         else:
-    #             tournament_winner = self.winners[-1]
-    #             await self.send(text_data=json.dumps({
-    #                 'status': 'tournament_complete',
-    #                 'winner': tournament_winner,
-    #             }))
-
     async def run_game_loop(self):
         while not self.game_state['gameOver']:
             self.update_ball_position()
