@@ -137,7 +137,7 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 if self.game_state['paddle1Y'] < self.game_state['ballY'] < self.game_state['paddle1Y'] + 75:
                     self.game_state['ballSpeedX'] = -self.game_state['ballSpeedX']
                     deltaY = self.game_state['ballY'] - (self.game_state['paddle1Y'] + 75 / 2)
-                    self.game_state['ballSpeedY'] += deltaY * 0.02  # Slight variation in speed based on hit point
+                    self.game_state['ballSpeedY'] += deltaY * 0.09  # Slight variation in speed based on hit point
                 else:
                     self.game_state['score2'] += 1
                     self.reset_ball()
@@ -146,7 +146,7 @@ class TournamentConsumer(AsyncWebsocketConsumer):
                 if self.game_state['paddle2Y'] < self.game_state['ballY'] < self.game_state['paddle2Y'] + 75:
                     self.game_state['ballSpeedX'] = -self.game_state['ballSpeedX']
                     deltaY = self.game_state['ballY'] - (self.game_state['paddle2Y'] + 75 / 2)
-                    self.game_state['ballSpeedY'] += deltaY * 0.02  # Slight variation in speed based on hit point
+                    self.game_state['ballSpeedY'] += deltaY * 0.09  # Slight variation in speed based on hit point
                 else:
                     self.game_state['score1'] += 1
                     self.reset_ball()
